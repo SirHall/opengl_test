@@ -1,0 +1,14 @@
+{
+    "type": "shader",
+    "name": "def",
+    "sources": [
+        {
+            "path": "./shader_vert.glsl",
+            "type": "vertex"
+        },
+        {
+            "path": "./shader_frag.glsl",
+            "type": "fragment"
+        }
+    ]
+}
