@@ -1,3 +1,4 @@
+#include "Mesh.hpp"
 #include "OpenGLExtensions.hpp"
 #include "Shader.hpp"
 #include "ShaderSource.hpp"
@@ -82,40 +83,6 @@ int main(int argc, char *argv[])
     GLCall(std::cout << "OpenGL Version: " << glGetString(GL_VERSION)
                      << std::endl);
 
-    // Setup buffer
-    std::vector<float> positions = {
-        -0.5f, -0.5f, // 0
-        0.5f,  -0.5f, // 1
-        0.5f,  0.5f,  // 2
-        -0.5f, 0.5f   // 3
-    };
-
-    std::vector<unsigned short> indices = {0, 1, 2, 0, 2, 3};
-
-    // Vertex buffer
-    unsigned int buffer = 0;
-    GLCall(glGenBuffers(1, &buffer));
-    GLCall(glBindBuffer(GL_ARRAY_BUFFER, buffer));
-    GLCall(glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(float),
-                        positions.data(), GL_STATIC_DRAW));
-
-    // Setup vertex array
-    GLuint vertexArrayObject = 0;
-    GLCall(glGenVertexArrays(1, &vertexArrayObject));
-    GLCall(glBindVertexArray(vertexArrayObject));
-
-    GLCall(glEnableVertexAttribArray(0));
-    GLCall(
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0));
-
-    // Index buffer
-    GLuint indexBufferObject = 0;
-    GLCall(glGenBuffers(1, &indexBufferObject));
-    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObject));
-    GLCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                        indices.size() * sizeof(unsigned short), indices.data(),
-                        GL_STATIC_DRAW));
-
 #pragma region Compile Shaders
 
     auto shaderSources       = ShaderSource::ReadShaderSources("res/");
@@ -137,9 +104,9 @@ int main(int argc, char *argv[])
 #pragma endregion
 
     // Unbind all
-    GLCall(glBindVertexArray(0));
-    GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0)); // Probably not needed
-    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    // GLCall(glBindVertexArray(0));
+    // GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0)); // Probably not needed
+    // GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
     GLCall(glUseProgram(0));
 
 #pragma region Render Data
@@ -147,9 +114,18 @@ int main(int argc, char *argv[])
     // Projection matrix
     glm::mat4 projection =
         glm::ortho(0.0f, (GLfloat)1, (GLfloat)1, 0.0f, 0.1f, 100.0f);
-    //  glm::perspective(
-    //     45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.1f,
-    //     100.0f);
+    // glm::mat4 projection = glm::perspective(
+    //     45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.1f, 100.0f);
+
+    Mesh mesh = Mesh();
+    mesh.CreateMesh(
+        {
+            Vertex(-0.5f, -0.5f, 0.0f), // 0
+            Vertex(0.5f, -0.5f, 0.0f),  // 1
+            Vertex(0.5f, 0.5f, 0.0f),   // 2
+            Vertex(-0.5f, 0.5f, 0.0f)   // 3
+        },
+        {0, 1, 2, 0, 2, 3});
 
 #pragma endregion
 
@@ -164,10 +140,6 @@ int main(int argc, char *argv[])
 
         //--- Binding ---//
         shaders->at(0).SetInUse();
-
-        GLCall(glBindVertexArray(vertexArrayObject));
-        GLCall(glBindBuffer(GL_ARRAY_BUFFER, buffer)); // Probably not needed
-        GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObject));
 
         //--- Setup for draw ---//
         GLint colorUniformLoc = shaders->at(0).GetUniformLocation("u_Color");
@@ -198,11 +170,13 @@ int main(int argc, char *argv[])
 
         //--- Drawing ---//
         // The actual draw call
-        GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr));
+        mesh.RenderMesh();
 
         // Swap front and back buffers
         GLCall(glfwSwapBuffers(window));
     }
+
+    mesh.ClearMesh();
 
     GLCall(glfwTerminate());
     return 0;
