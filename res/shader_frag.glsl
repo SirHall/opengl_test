@@ -2,8 +2,8 @@
 
 out vec4 color;
 
-// in vec4 vert_pos;
+in vec4 vertPos;
 
 uniform vec4 u_Color;
 
-void main() { color = u_Color; }
+void main() { color = (vertPos * 0.5) + 0.5; }
