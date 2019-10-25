@@ -17,7 +17,7 @@ std::size_t VecTotalSize(const std::vector<T> &vec)
 
 Mesh::Mesh() : vao(0), vbo(0), ibo(0) {}
 
-Mesh::~Mesh() {}
+Mesh::~Mesh() { ClearMesh(); }
 
 void Mesh::CreateMesh(std::vector<Vertex> &&       vertices,
                       std::vector<std::uint32_t> &&indices)
@@ -63,4 +63,25 @@ void Mesh::RenderMesh()
     GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 }
 
-void Mesh::ClearMesh() {}
+void Mesh::ClearMesh()
+{
+    glDeleteBuffers(1, &ibo);
+    ibo = 0;
+    glDeleteBuffers(1, &vbo);
+    vbo = 0;
+    glDeleteVertexArrays(1, &vao);
+    vao = 0;
+    indices.clear();
+    vertices.clear();
+}
+
+Mesh::Mesh(Mesh &&other)
+{
+    vao       = other.vao;
+    vbo       = other.vbo;
+    ibo       = other.ibo;
+    other.vao = other.vbo = other.ibo = 0; // Clear other
+
+    vertices = std::move(other.vertices);
+    indices  = std::move(other.indices);
+}

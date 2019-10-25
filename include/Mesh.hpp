@@ -20,6 +20,11 @@ private:
 
 public:
     Mesh();
+    Mesh(const Mesh &other) = delete; // Allow copying
+    Mesh &operator=(const Mesh &other) = delete;
+    Mesh(Mesh &&other); // Allow moving
+    Mesh &operator=(Mesh &&other) = default;
+
     ~Mesh();
 
     void CreateMesh(std::vector<Vertex> &&       vertices,
