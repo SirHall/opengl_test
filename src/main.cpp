@@ -2,6 +2,7 @@
 #include "OpenGLExtensions.hpp"
 #include "Shader.hpp"
 #include "ShaderSource.hpp"
+#include "extern/stb_image.hpp"
 
 // OpenGL Start
 #include <GL/glew.h>
@@ -10,11 +11,49 @@
 // OpenGL End
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/quaternion.hpp>
 
+#include <chrono>
+#include <cmath>
 #include <iostream>
 #include <vector>
+
+using namespace std::chrono;
+
+float  deltaTime  = 0.1f;
+float  mouseXDiff = 0.0f, mouseYDiff = 0.0f;
+double lastMouseX = 0.0, lastMouseY = 0.0;
+bool   firstUpdate = true;
+
+float GetTime(steady_clock::time_point start, steady_clock::time_point now)
+{
+    steady_clock::duration duration = now - start;
+    return float(duration.count()) * steady_clock::period::num /
+           steady_clock::period::den;
+}
+
+float GetTime(steady_clock::time_point start)
+{
+    return GetTime(start, steady_clock::now());
+}
+
+static void MousePosEvent(GLFWwindow *window, double xpos, double ypos)
+{
+    if (firstUpdate)
+    {
+        firstUpdate = false;
+        lastMouseX  = xpos;
+        lastMouseY  = ypos;
+    }
+    mouseXDiff = xpos - lastMouseX;
+    mouseYDiff = ypos - lastMouseY;
+    lastMouseX = xpos;
+    lastMouseY = ypos;
+}
 
 int main(int argc, char *argv[])
 {
@@ -112,28 +151,63 @@ int main(int argc, char *argv[])
 #pragma region Render Data
 
     // Projection matrix
-    glm::mat4 projection =
-        glm::ortho(0.0f, (GLfloat)1, (GLfloat)1, 0.0f, 0.1f, 100.0f);
-    // glm::mat4 projection = glm::perspective(
-    //     45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.1f, 100.0f);
+    // glm::mat4 projection =
+    //     glm::ortho(0.0f, (GLfloat)1, (GLfloat)1, 0.0f, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(
+        45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.1f, 100.0f);
 
-    Mesh mesh = Mesh();
-    mesh.CreateMesh(
-        {
-            Vertex(-0.5f, -0.5f, 0.0f), // 0
-            Vertex(0.5f, -0.5f, 0.0f),  // 1
-            Vertex(0.5f, 0.5f, 0.0f),   // 2
-            Vertex(-0.5f, 0.5f, 0.0f)   // 3
-        },
-        {0, 1, 2, 0, 2, 3});
+    std::vector<Mesh> meshes = std::vector<Mesh>();
+
+    Mesh cubeMesh = Mesh();
+    cubeMesh.CreateMesh({Vertex(1.f, 1.f, 1.f, 0.0f, 0.0f),    // 0
+                         Vertex(-1.f, 1.f, 1.f, 0.0f, 0.0f),   // 1
+                         Vertex(-1.f, 1.f, -1.f, 0.0f, 0.0f),  // 2
+                         Vertex(1.f, 1.f, -1.f, 0.0f, 0.0f),   // 3
+                         Vertex(1.f, -1.f, 1.f, 0.0f, 0.0f),   // 4
+                         Vertex(-1.f, -1.f, 1.f, 0.0f, 0.0f),  // 5
+                         Vertex(-1.f, -1.f, -1.f, 0.0f, 0.0f), // 6
+                         Vertex(1.f, -1.f, -1.f, 0.0f, 0.0f)}, // 7
+                        {0, 1, 3, 3, 1, 2, 2, 6, 7, 7, 3, 2, 7, 6, 5, 5, 4, 7,
+                         5, 1, 4, 4, 1, 0, 4, 3, 7, 3, 4, 0, 5, 6, 2, 5, 1, 2});
+
+    meshes.push_back(std::move(cubeMesh));
 
 #pragma endregion
+
+    // Model matrix (Where the object's position is defined)
+    glm::mat4 model =
+        glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+
+    glm::mat4 view =
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f, 1.0f, 0.0f));
+
+    glm::mat4 camPitch = glm::mat4(1.0f);
+    glm::mat4 camYaw   = glm::mat4(1.0f);
+
+    auto lastTimePoint = steady_clock::now();
+
+    // Hide and lock the cursor, and prep it for motion-based detection
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // Use raw mouse motion input
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
+    glfwSetCursorPosCallback(window, MousePosEvent);
 
     // Loop until the user closes the window
     while (!glfwWindowShouldClose(window))
     {
         // Poll for and process events
         GLCall(glfwPollEvents());
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_TRUE)
+            break;
+
+        // Calculate the delta-time for this frame
+        auto now      = steady_clock::now();
+        deltaTime     = GetTime(lastTimePoint, now);
+        lastTimePoint = now;
 
         // Render here
         GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
@@ -147,9 +221,71 @@ int main(int argc, char *argv[])
         {
             GLCall(glUniform4f(colorUniformLoc, 0.8f, 0.3f, 0.2f, 1.0f));
         }
-        // Model matrix (Where the object's position is defined)
-        glm::mat4 model =
-            glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+
+        // Rotate the model
+        // model = glm::rotate(model, 0.005f, glm::vec3(1.0f, 1.0f, 1.0f));
+
+        // Update view matrix based on user input
+        // View matrix position
+        float cameraSpeed = 8.0f, cameraSensitivity = 0.005f;
+
+        // View matrix rotation
+        // camPitch *= glm::rotate(glm::mat4(1.0f), mouseYDiff *
+        // cameraSensitivity,
+        //                         glm::vec3(1.0f, 0.0f, 0.0f));
+        // camYaw *= glm::rotate(glm::mat4(1.0f), mouseXDiff *
+        // cameraSensitivity,
+        //                       glm::vec3(0.0f, 1.0f, 0.0f));
+
+        auto camPitchDiff =
+            glm::rotate(glm::mat4(1.0f), mouseYDiff * cameraSensitivity,
+                        glm::vec3(1.0f, 0.0f, 0.0f));
+        auto camYawDiff =
+            glm::rotate(glm::mat4(1.0f), mouseXDiff * cameraSensitivity,
+                        glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // View matrix position
+        glm::vec3 moveVec = glm::vec3(0.0f, 0.0f, 0.0f);
+        // Forward/Backward
+        if (glfwGetKey(window, GLFW_KEY_W) == GL_TRUE)
+            moveVec.z = 1.0f;
+        else if (glfwGetKey(window, GLFW_KEY_S) == GL_TRUE)
+            moveVec.z = -1.0f;
+
+        // Right/Left
+        if (glfwGetKey(window, GLFW_KEY_D) == GL_TRUE)
+            moveVec.x = -1.0f;
+        else if (glfwGetKey(window, GLFW_KEY_A) == GL_TRUE)
+            moveVec.x = 1.0f;
+
+        // Up/Down
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GL_TRUE)
+            moveVec.y = -1.0f;
+        else if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GL_TRUE)
+            moveVec.y = 1.0f;
+
+        glm::vec3 viewScale;
+        glm::quat viewRotation;
+        glm::vec3 viewPos = glm::vec3(0.0f, 0.0f, 0.0f);
+        glm::vec3 viewSkew;
+        glm::vec4 viewPerspective;
+
+        glm::decompose(view, viewScale, viewRotation, viewPos, viewSkew,
+                       viewPerspective);
+
+        glm::mat4 viewTransform = glm::translate(glm::mat4(1.0f), -viewPos);
+        viewTransform           = viewTransform * glm::toMat4(viewRotation);
+        glm::mat4 inverseViewTransform = glm::inverse(viewTransform);
+
+        view = (viewTransform * camYawDiff * inverseViewTransform) * view;
+        view = camPitchDiff * view;
+        view =
+            glm::translate(glm::mat4(1.0f), moveVec * cameraSpeed * deltaTime) *
+            view;
+        // view = glm::translate(view, moveVec * cameraSpeed * deltaTime);
+
+        // Reset the diffs
+        mouseXDiff = mouseYDiff = 0.0f;
 
         // Assign the object model to the uniform (Not good for more than
         // one object)
@@ -168,15 +304,26 @@ int main(int argc, char *argv[])
                                       glm::value_ptr(projection)));
         }
 
+        // Assign the view matrix
+        GLint viewUniformLoc = shaders->at(0).GetUniformLocation("view");
+        if (viewUniformLoc >= 0)
+        {
+            GLCall(
+                glUniformMatrix4fv(viewUniformLoc, 1, GL_FALSE,
+                                   glm::value_ptr(camYaw * camPitch * view)));
+        }
+
         //--- Drawing ---//
         // The actual draw call
-        mesh.RenderMesh();
+        for (std::size_t i = 0; i < meshes.size(); i++)
+            meshes[i].RenderMesh();
 
         // Swap front and back buffers
         GLCall(glfwSwapBuffers(window));
     }
 
-    mesh.ClearMesh();
+    for (std::size_t i = 0; i < meshes.size(); i++)
+        meshes[i].ClearMesh();
 
     GLCall(glfwTerminate());
     return 0;
