@@ -4,5 +4,12 @@ layout(location = 0) in vec4 position;
 
 uniform mat4 model;
 uniform mat4 projection;
+uniform mat4 view;
 
-void main() { gl_Position = projection * model * position; }
+out vec4 vertPos;
+
+void main()
+{
+    gl_Position = projection * view * model * position;
+    vertPos     = position;
+}
